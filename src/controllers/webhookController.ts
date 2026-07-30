@@ -64,6 +64,11 @@ export const handleIncomingMessage = async (req: Request, res: Response) => {
 
       if (entry.messaging) {
         for (const webhookEvent of entry.messaging) {
+          // Ignorar los "echoes" (mensajes que el propio bot o un humano mandó desde la página)
+          if (webhookEvent.sender?.id === pageId) {
+            continue;
+          }
+
           // Solo procesamos mensajes de texto (ignoramos leidos, entregados, etc)
           if (webhookEvent.message && webhookEvent.message.text) {
             const senderId = webhookEvent.sender.id;
