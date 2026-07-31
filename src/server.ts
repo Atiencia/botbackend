@@ -18,6 +18,9 @@ dotenv.config();
 const app = express();
 const port = process.env.PORT || 3000;
 
+// Configuración requerida por Vercel para express-rate-limit (trust proxy)
+app.set('trust proxy', 1);
+
 // Configuración de Rate Limiter
 // Limitamos a 100 peticiones cada 15 minutos por IP
 const limiter = rateLimit({
