@@ -39,7 +39,14 @@ export const simulateChat = async (req: Request, res: Response) => {
         knowledgeText = matches.map((m: any) => m.content).join('\n\n');
       }
     } catch (embErr) {
-      logger.error('Simulation: Error in semantic search', embErr);
+      logger.error('Simulation: Semantic search failed, using text fallback', embErr);
+      // Fallback: traer conocimiento por texto sin embeddings
+      const { data: fallbackData } = await supabase
+        .from('knowledge')
+        .select('content')
+        .eq('user_id', botConfig.user_id)
+        .limit(5);
+      knowledgeText = fallbackData?.map(k => k.content).join('\n\n') || '';
     }
 
     const aiResponse = await aiService.getBotResponse(

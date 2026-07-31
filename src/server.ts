@@ -44,7 +44,14 @@ app.use('/api/customers', customersRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/simulate', simulateRoutes);
 
+// Ruta de Health Check - ayuda a verificar que el servidor está vivo
+app.get('/', (_req, res) => {
+  res.status(200).json({ status: 'ok', message: 'Eli Bot Backend is running' });
+});
+
 // Exportamos app para Vercel Serverless Functions
+// module.exports es necesario para que @vercel/node lo reconozca correctamente
+module.exports = app;
 export default app;
 
 // Solo iniciamos el servidor local si NO estamos en Vercel
