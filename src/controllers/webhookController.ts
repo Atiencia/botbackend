@@ -3,6 +3,7 @@ import { supabase } from '../config/supabase';
 import { logger } from '../config/logger';
 import { metaService } from '../services/MetaService';
 import { aiService } from '../services/AIService';
+import { embeddingService } from '../services/EmbeddingService';
 
 /**
  * GET: Verificación del Webhook por parte de Meta
@@ -97,13 +98,35 @@ export const handleIncomingMessage = async (req: Request, res: Response) => {
                 }
               }
 
-              // 2. Obtener Base de Conocimiento del usuario
-              const { data: knowledgeData } = await supabase
-                .from('knowledge')
-                .select('content')
-                .eq('user_id', botConfig.user_id);
-              
-              const knowledgeText = knowledgeData?.map(k => k.content).join('\n\n') || '';
+              // 2. Búsqueda semántica de conocimiento (RAG real con pgvector)
+              let knowledgeText = '';
+              try {
+                const queryEmbedding = await embeddingService.generateEmbedding(messageText);
+                
+                // Llamamos a la función de Postgres creada en supabase_setup.sql
+                const { data: matches, error: matchError } = await supabase.rpc('match_knowledge', {
+                  query_embedding: queryEmbedding,
+                  match_threshold: 0.1, // Umbral muy bajo para ser permisivos
+                  match_count: 4, // Traemos hasta los 4 fragmentos más relevantes
+                  p_user_id: botConfig.user_id
+                });
+
+                if (matchError) throw matchError;
+
+                if (matches && matches.length > 0) {
+                  knowledgeText = matches.map((m: any) => m.content).join('\n\n');
+                  logger.info(`Found ${matches.length} semantic matches for context.`);
+                }
+              } catch (embErr) {
+                logger.error('Error in semantic search, falling back to full knowledge:', embErr);
+                // Fallback clásico: si falla pgvector, traemos los primeros conocimientos
+                const { data: fallbackData } = await supabase
+                  .from('knowledge')
+                  .select('content')
+                  .eq('user_id', botConfig.user_id)
+                  .limit(5);
+                knowledgeText = fallbackData?.map(k => k.content).join('\n\n') || '';
+              }
 
               // 3. Obtener Historial de Chat reciente (ultimos 10 mensajes)
               const { data: chatHistoryData } = await supabase

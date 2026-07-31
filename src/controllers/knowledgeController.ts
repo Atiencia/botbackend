@@ -2,6 +2,7 @@ import { Response } from 'express';
 import { AuthRequest } from '../middlewares/authMiddleware';
 import { supabase } from '../config/supabase';
 import { logger } from '../config/logger';
+import { embeddingService } from '../services/EmbeddingService';
 
 export const getKnowledge = async (req: AuthRequest, res: Response) => {
   try {
@@ -29,9 +30,23 @@ export const addKnowledge = async (req: AuthRequest, res: Response) => {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
+    // 1. Generamos el embedding local del texto usando Transformers.js
+    let embedding: number[] = [];
+    try {
+      embedding = await embeddingService.generateEmbedding(`${category}: ${content}`);
+    } catch (embError) {
+      logger.error('Error generating embedding, saving without vector:', embError);
+    }
+
+    // 2. Guardamos en base de datos con o sin el embedding
     const { data, error } = await supabase
       .from('knowledge')
-      .insert([{ user_id: userId, category, content }])
+      .insert([{ 
+        user_id: userId, 
+        category, 
+        content,
+        embedding: embedding.length > 0 ? embedding : null 
+      }])
       .select();
 
     if (error) throw error;
