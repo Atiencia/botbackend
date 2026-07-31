@@ -1,9 +1,13 @@
 import { pipeline, env } from '@xenova/transformers';
 import { logger } from '../config/logger';
+import path from 'path';
+import os from 'os';
 
-// Desactivar descargas de modelos locales en producción (se descargarán on the fly y se cacheados)
+// Configuración obligatoria para Vercel Serverless (Filesystem es Read-Only)
 env.allowLocalModels = false;
 env.useBrowserCache = false;
+// Vercel solo permite escribir en la carpeta /tmp
+env.cacheDir = path.join(os.tmpdir(), '.cache');
 
 class EmbeddingService {
   private extractor: any = null;
