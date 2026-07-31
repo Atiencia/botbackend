@@ -7,7 +7,29 @@ DROP TABLE IF EXISTS public.knowledge CASCADE;
 DROP TABLE IF EXISTS public.chats CASCADE;
 DROP TABLE IF EXISTS public.bot_configs CASCADE;
 
--- ... [bot_configs table remains unchanged here] ...
+-- 2. Tabla de configuración del bot (bot_configs)
+CREATE TABLE public.bot_configs (
+    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE UNIQUE NOT NULL,
+    system_prompt TEXT DEFAULT 'Eres un asistente útil.',
+    model TEXT DEFAULT 'llama-3.1-8b-instant',
+    temperature NUMERIC DEFAULT 0.7,
+    meta_access_token TEXT,
+    meta_verify_token TEXT,
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+-- 2.5 Tabla de Clientes (Handoff a humano)
+CREATE TABLE public.customers (
+    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    instagram_user_id TEXT NOT NULL,
+    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+    is_bot_active BOOLEAN DEFAULT true,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+    UNIQUE(instagram_user_id, user_id)
+);
 
 -- 3. Tabla de Base de Conocimiento (knowledge)
 CREATE TABLE public.knowledge (
@@ -88,3 +110,8 @@ CREATE POLICY "Users can delete their own knowledge" ON public.knowledge FOR DEL
 -- Políticas para chats
 CREATE POLICY "Users can view their own chats" ON public.chats FOR SELECT USING (auth.uid() = user_id);
 CREATE POLICY "Users can insert their own chats" ON public.chats FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+-- Políticas para customers
+CREATE POLICY "Users can view their own customers" ON public.customers FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Users can insert their own customers" ON public.customers FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Users can update their own customers" ON public.customers FOR UPDATE USING (auth.uid() = user_id);

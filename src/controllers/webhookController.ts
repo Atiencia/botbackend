@@ -98,7 +98,35 @@ export const handleIncomingMessage = async (req: Request, res: Response) => {
                 }
               }
 
-              // 2. Búsqueda semántica de conocimiento (RAG real con pgvector)
+              // 2. Registrar cliente y comprobar si el bot está pausado (Handoff a humano)
+              const { data: customerData } = await supabase
+                .from('customers')
+                .select('is_bot_active')
+                .eq('instagram_user_id', senderId)
+                .eq('user_id', botConfig.user_id)
+                .single();
+
+              // Si el cliente no existe, lo creamos
+              if (!customerData) {
+                await supabase.from('customers').insert({
+                  instagram_user_id: senderId,
+                  user_id: botConfig.user_id
+                });
+              } else {
+                // Actualizar timestamp
+                await supabase.from('customers')
+                  .update({ updated_at: new Date().toISOString() })
+                  .eq('instagram_user_id', senderId)
+                  .eq('user_id', botConfig.user_id);
+              }
+
+              // Si un humano pauso el bot para este cliente, no hacemos nada más
+              if (customerData && customerData.is_bot_active === false) {
+                logger.info(`Bot is paused for customer ${senderId}. Skipping AI response.`);
+                continue;
+              }
+
+              // 3. Búsqueda semántica de conocimiento (RAG real con pgvector)
               let knowledgeText = '';
               try {
                 const queryEmbedding = await embeddingService.generateEmbedding(messageText);
@@ -128,7 +156,7 @@ export const handleIncomingMessage = async (req: Request, res: Response) => {
                 knowledgeText = fallbackData?.map(k => k.content).join('\n\n') || '';
               }
 
-              // 3. Obtener Historial de Chat reciente (ultimos 10 mensajes)
+              // 4. Obtener Historial de Chat reciente (ultimos 10 mensajes)
               const { data: chatHistoryData } = await supabase
                 .from('chats')
                 .select('role, content')
@@ -141,7 +169,7 @@ export const handleIncomingMessage = async (req: Request, res: Response) => {
                 ? chatHistoryData.reverse().map(c => ({ role: c.role as 'user' | 'assistant', content: c.content }))
                 : [];
 
-              // 4. Generar respuesta con IA
+              // 5. Generar respuesta con IA
               const aiResponse = await aiService.getBotResponse(
                 botConfig.system_prompt,
                 knowledgeText,
@@ -151,11 +179,11 @@ export const handleIncomingMessage = async (req: Request, res: Response) => {
                 botConfig.temperature
               );
 
-              // 5. Enviar respuesta por Graph API
+              // 6. Enviar respuesta por Graph API
               const sent = await metaService.sendMessage(senderId, aiResponse, botConfig.meta_access_token);
 
               if (sent) {
-                // 6. Guardar respuesta del bot en BD
+                // 7. Guardar respuesta del bot en BD
                 await supabase.from('chats').insert({
                   instagram_user_id: senderId,
                   user_id: botConfig.user_id,
