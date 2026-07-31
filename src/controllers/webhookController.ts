@@ -73,17 +73,29 @@ export const handleIncomingMessage = async (req: Request, res: Response) => {
           if (webhookEvent.message && webhookEvent.message.text) {
             const senderId = webhookEvent.sender.id;
             const messageText = webhookEvent.message.text;
+            const metaMessageId = webhookEvent.message.mid;
 
             logger.info(`Received message from ${senderId}: ${messageText}`);
 
             try {
               // 1. Guardar mensaje del usuario en BD
-              await supabase.from('chats').insert({
+              const { error: insertError } = await supabase.from('chats').insert({
                 instagram_user_id: senderId,
                 user_id: botConfig.user_id,
                 role: 'user',
-                content: messageText
+                content: messageText,
+                meta_message_id: metaMessageId
               });
+
+              if (insertError) {
+                // 23505 es el código de error de PostgreSQL para Unique Violation
+                if (insertError.code === '23505') {
+                  logger.info(`Message ${metaMessageId} already processed. Ignoring duplicate.`);
+                  continue; // Saltamos este mensaje ya que lo procesamos antes
+                } else {
+                  throw insertError; // Si es otro error, lo lanzamos
+                }
+              }
 
               // 2. Obtener Base de Conocimiento del usuario
               const { data: knowledgeData } = await supabase

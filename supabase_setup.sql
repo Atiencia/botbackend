@@ -36,6 +36,7 @@ CREATE TABLE public.chats (
     user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
     role TEXT CHECK (role IN ('user', 'assistant', 'system')) NOT NULL,
     content TEXT NOT NULL,
+    meta_message_id TEXT UNIQUE, -- ID del mensaje de Meta para evitar procesar duplicados
     timestamp TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
