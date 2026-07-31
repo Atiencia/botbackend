@@ -1,10 +1,10 @@
 import { Router } from 'express';
 import { getAnalytics } from '../controllers/analyticsController';
-import { authMiddleware } from '../middlewares/authMiddleware';
+import { requireAuth } from '../middlewares/authMiddleware';
 
 const router = Router();
 
-router.use(authMiddleware);
+router.use(requireAuth);
 
 router.get('/', getAnalytics);
 
