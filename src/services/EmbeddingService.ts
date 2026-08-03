@@ -1,46 +1,77 @@
+import axios from 'axios';
 import { logger } from '../config/logger';
 
-class EmbeddingService {
-  private extractor: any = null;
-  private initFailed = false;
+const HF_API_URL = 'https://api-inference.huggingface.co/pipeline/feature-extraction/sentence-transformers/all-MiniLM-L6-v2';
 
-  async init() {
-    if (this.extractor || this.initFailed) return;
-    
-    try {
-      logger.info('Inicializando modelo de embeddings (Xenova)...');
-      
-      // Importación dinámica con variable para evitar que el bundler de Vercel
-      // intente resolver este módulo en tiempo de build
-      const moduleName = '@xenova/transformers';
-      const transformers = await import(/* webpackIgnore: true */ moduleName);
-      
-      // Configuración para entornos serverless (Filesystem Read-Only)
-      transformers.env.allowLocalModels = false;
-      transformers.env.useBrowserCache = false;
-      
-      // Usar /tmp como cache en entornos serverless
-      const os = await import('os');
-      const path = await import('path');
-      transformers.env.cacheDir = path.join(os.tmpdir(), '.xenova-cache');
-      
-      this.extractor = await transformers.pipeline('feature-extraction', 'Xenova/all-MiniLM-L6-v2');
-      logger.info('Modelo de embeddings listo.');
-    } catch (error) {
-      this.initFailed = true;
-      logger.warn('Embeddings no disponibles (normal en Vercel). Se usará búsqueda por texto.');
+class EmbeddingService {
+  private apiKey: string;
+
+  constructor() {
+    this.apiKey = process.env.HUGGINGFACE_API_KEY || '';
+    if (!this.apiKey) {
+      logger.warn('HUGGINGFACE_API_KEY no está configurada. Los embeddings no funcionarán.');
     }
   }
 
   async generateEmbedding(text: string): Promise<number[]> {
-    await this.init();
-    
-    if (!this.extractor) {
-      throw new Error('Embeddings no disponibles. Usar fallback de texto.');
+    if (!this.apiKey) {
+      throw new Error('HUGGINGFACE_API_KEY no configurada.');
     }
-    
-    const output = await this.extractor(text, { pooling: 'mean', normalize: true });
-    return Array.from(output.data);
+
+    try {
+      const response = await axios.post(
+        HF_API_URL,
+        { inputs: text, options: { wait_for_model: true } },
+        {
+          headers: {
+            'Authorization': `Bearer ${this.apiKey}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+
+      // La API devuelve un array de arrays (una por cada token).
+      // Necesitamos hacer mean pooling para obtener un solo vector de 384 dimensiones.
+      const tokenEmbeddings: number[][] = response.data;
+
+      if (!Array.isArray(tokenEmbeddings) || tokenEmbeddings.length === 0) {
+        throw new Error('Respuesta inesperada de Hugging Face API');
+      }
+
+      // Si la respuesta ya es un vector plano (384 dims), lo retornamos directamente
+      if (typeof tokenEmbeddings[0] === 'number') {
+        return tokenEmbeddings as unknown as number[];
+      }
+
+      // Mean pooling: promediamos todos los vectores de tokens
+      const dimensions = tokenEmbeddings[0].length;
+      const meanVector = new Array(dimensions).fill(0);
+
+      for (const tokenVec of tokenEmbeddings) {
+        for (let i = 0; i < dimensions; i++) {
+          meanVector[i] += tokenVec[i];
+        }
+      }
+
+      for (let i = 0; i < dimensions; i++) {
+        meanVector[i] /= tokenEmbeddings.length;
+      }
+
+      // Normalizar el vector (L2 normalization)
+      const norm = Math.sqrt(meanVector.reduce((sum: number, val: number) => sum + val * val, 0));
+      const normalized = meanVector.map((val: number) => val / norm);
+
+      return normalized;
+    } catch (error: any) {
+      if (error.response?.status === 503) {
+        // El modelo está cargando en HF, reintentamos una vez después de esperar
+        logger.info('Modelo de HF cargando, reintentando en 5 segundos...');
+        await new Promise(resolve => setTimeout(resolve, 5000));
+        return this.generateEmbedding(text);
+      }
+      logger.error('Error generando embedding con Hugging Face:', error.message);
+      throw error;
+    }
   }
 }
 

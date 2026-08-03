@@ -18,20 +18,17 @@ dotenv.config();
 const app = express();
 const port = process.env.PORT || 3000;
 
-// Configuración requerida por Vercel para express-rate-limit (trust proxy)
+// Trust proxy para rate limiter detrás de Vercel
 app.set('trust proxy', 1);
 
-// Configuración de Rate Limiter
-// Limitamos a 100 peticiones cada 15 minutos por IP
+// Rate Limiter: 100 peticiones cada 15 minutos por IP
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, 
   max: 100,
   message: { error: 'Too many requests from this IP, please try again after 15 minutes' }
 });
 
-// Aplicamos el limiter globalmente
 app.use(limiter);
-
 app.use(cors());
 app.use(express.json());
 
@@ -44,19 +41,18 @@ app.use('/api/customers', customersRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/simulate', simulateRoutes);
 
-// Ruta de Health Check - ayuda a verificar que el servidor está vivo
+// Health Check
 app.get('/', (_req, res) => {
   res.status(200).json({ status: 'ok', message: 'Eli Bot Backend is running' });
 });
 
-// Exportamos app para Vercel Serverless Functions
-// module.exports es necesario para que @vercel/node lo reconozca correctamente
+// Exportamos para Vercel Serverless
 module.exports = app;
 export default app;
 
-// Solo iniciamos el servidor local si NO estamos en Vercel
+// Solo arrancamos el servidor en desarrollo local
 if (process.env.NODE_ENV !== 'production') {
   app.listen(port, () => {
-    logger.info(`Server running on port ${port} (Supabase setup complete)`);
+    logger.info(`Server running on port ${port}`);
   });
 }
