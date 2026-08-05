@@ -21,15 +21,17 @@ const port = process.env.PORT || 3000;
 // Trust proxy para rate limiter detrás de Vercel
 app.set('trust proxy', 1);
 
-// Rate Limiter: 100 peticiones cada 15 minutos por IP
+// Primero CORS, luego Rate Limit
+app.use(cors());
+
+// Rate Limiter: 1000 peticiones cada 15 minutos por IP (dashboard hace polling)
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, 
-  max: 100,
+  max: 1000,
   message: { error: 'Too many requests from this IP, please try again after 15 minutes' }
 });
 
 app.use(limiter);
-app.use(cors());
 app.use(express.json());
 
 // API Routes
