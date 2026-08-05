@@ -49,7 +49,7 @@ export const simulateChat = async (req: Request, res: Response) => {
       knowledgeText = fallbackData?.map(k => k.content).join('\n\n') || '';
     }
 
-    const aiResponse = await aiService.getBotResponse(
+    let aiResponse = await aiService.getBotResponse(
       botConfig.system_prompt,
       knowledgeText,
       chatHistory,
@@ -57,6 +57,11 @@ export const simulateChat = async (req: Request, res: Response) => {
       botConfig.model,
       botConfig.temperature
     );
+
+    // Limpiamos la palabra secreta igual que en producción para que el simulador sea realista
+    if (aiResponse.includes('[HANDOFF]')) {
+      aiResponse = aiResponse.replace(/\[HANDOFF\]/g, '').trim();
+    }
 
     res.status(200).json({ response: aiResponse });
   } catch (err) {
