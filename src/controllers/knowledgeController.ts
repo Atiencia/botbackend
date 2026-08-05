@@ -75,3 +75,41 @@ export const deleteKnowledge = async (req: AuthRequest, res: Response) => {
     res.status(500).json({ error: 'Error deleting knowledge' });
   }
 };
+
+export const updateKnowledge = async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.user?.id;
+    const { id } = req.params;
+    const { category, content } = req.body;
+
+    if (!category || !content) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    // 1. Generamos el nuevo embedding
+    let embedding: number[] = [];
+    try {
+      embedding = await embeddingService.generateEmbedding(`${category}: ${content}`);
+    } catch (embError) {
+      logger.error('Error generating embedding for update:', embError);
+    }
+
+    // 2. Actualizamos en base de datos
+    const { data, error } = await supabase
+      .from('knowledge')
+      .update({ 
+        category, 
+        content,
+        embedding: embedding.length > 0 ? embedding : null 
+      })
+      .eq('id', id)
+      .eq('user_id', userId)
+      .select();
+
+    if (error) throw error;
+    res.status(200).json(data ? data[0] : null);
+  } catch (err) {
+    logger.error('Error updating knowledge:', err);
+    res.status(500).json({ error: 'Error updating knowledge' });
+  }
+};
