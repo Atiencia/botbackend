@@ -39,27 +39,22 @@ export const sendChatMessage = async (req: AuthRequest, res: Response): Promise<
     // 1. Obtener el token de Meta de la configuración del usuario
     const { data: botConfig, error: configError } = await supabase
       .from('bot_configs')
-      .select('meta_page_access_token')
+      .select('meta_access_token')
       .eq('user_id', userId)
       .single();
 
-    if (configError || !botConfig?.meta_page_access_token) {
+    if (configError || !botConfig?.meta_access_token) {
       logger.error('Error obteniendo config:', configError);
       res.status(400).json({ error: 'Falta configurar el Token de Meta' });
       return;
     }
 
-    // 2. Enviar mensaje por Meta API
-    const sent = await metaService.sendMessage(
+    // 2. Enviar mensaje por Meta API (ahora lanza un Error si falla)
+    await metaService.sendMessage(
       instagram_user_id,
       message,
-      botConfig.meta_page_access_token
+      botConfig.meta_access_token
     );
-
-    if (!sent) {
-      res.status(500).json({ error: 'Falló el envío por la API de Meta' });
-      return;
-    }
 
     // 3. Guardar el mensaje enviado en la BD local como rol 'assistant' para el historial
     const { error: insertError } = await supabase

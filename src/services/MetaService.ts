@@ -69,8 +69,9 @@ export class MetaService {
 
       return success;
     } catch (error: any) {
-      logger.error(`Error sending message to Meta: ${error.response?.data?.error?.message || error.message}`);
-      return false;
+      const errorMsg = error.response?.data?.error?.message || error.message;
+      logger.error(`Error sending message to Meta: ${errorMsg}`);
+      throw new Error(errorMsg);
     }
   }
 }
