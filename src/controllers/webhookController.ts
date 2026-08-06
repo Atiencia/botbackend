@@ -181,16 +181,17 @@ export const handleIncomingMessage = async (req: Request, res: Response) => {
 
               // 5.1 Auto-Handoff Secreto
               if (aiResponse.includes('[HANDOFF]')) {
-                // Limpiamos la palabra secreta para que el usuario no la vea
-                aiResponse = aiResponse.replace(/\[HANDOFF\]/g, '').trim();
-                
                 // Pausamos el bot automáticamente
                 await supabase.from('customers')
                   .update({ is_bot_active: false, updated_at: new Date().toISOString() })
                   .eq('instagram_user_id', senderId)
                   .eq('user_id', botConfig.user_id);
                   
-                logger.info(`Auto-Handoff triggered for customer ${senderId}`);
+                logger.info(`Auto-Handoff triggered for customer ${senderId}. Bot muted.`);
+                
+                // Handoff silencioso: No enviamos nada a Meta ni guardamos respuesta del bot.
+                // Saltamos al siguiente mensaje.
+                continue;
               }
 
               // 6. Enviar respuesta por Graph API

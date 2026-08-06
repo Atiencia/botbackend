@@ -24,15 +24,15 @@ export const getChats = async (req: AuthRequest, res: Response) => {
 export const sendChatMessage = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const userId = req.user?.id;
-    const { instagram_user_id, message } = req.body;
+    const { instagram_user_id, message, image_url } = req.body;
 
     if (!userId) {
       res.status(401).json({ error: 'No autorizado' });
       return;
     }
 
-    if (!instagram_user_id || !message) {
-      res.status(400).json({ error: 'instagram_user_id y message son requeridos' });
+    if (!instagram_user_id || (!message && !image_url)) {
+      res.status(400).json({ error: 'message o image_url son requeridos' });
       return;
     }
 
@@ -49,21 +49,28 @@ export const sendChatMessage = async (req: AuthRequest, res: Response): Promise<
       return;
     }
 
-    // 2. Enviar mensaje por Meta API (ahora lanza un Error si falla)
-    await metaService.sendMessage(
-      instagram_user_id,
-      message,
-      botConfig.meta_access_token
-    );
+    let finalContent = '';
 
-    // 3. Guardar el mensaje enviado en la BD local como rol 'assistant' para el historial
+    // 2. Enviar imagen por Meta API si existe
+    if (image_url) {
+      await metaService.sendImage(instagram_user_id, image_url, botConfig.meta_access_token);
+      finalContent += `[IMAGE: ${image_url}]\n`;
+    }
+
+    // 3. Enviar mensaje de texto por Meta API si existe
+    if (message && message.trim().length > 0) {
+      await metaService.sendMessage(instagram_user_id, message, botConfig.meta_access_token);
+      finalContent += message;
+    }
+
+    // 4. Guardar el mensaje enviado en la BD local como rol 'assistant' para el historial
     const { error: insertError } = await supabase
       .from('chats')
       .insert({
         user_id: userId,
         instagram_user_id,
         role: 'assistant',
-        content: message
+        content: finalContent.trim()
       });
 
     if (insertError) {

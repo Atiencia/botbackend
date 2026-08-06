@@ -74,6 +74,39 @@ export class MetaService {
       throw new Error(errorMsg);
     }
   }
+
+  /**
+   * Envía una imagen a Instagram/Messenger a través de Graph API usando una URL pública
+   */
+  async sendImage(recipientId: string, imageUrl: string, pageAccessToken: string): Promise<boolean> {
+    try {
+      const url = `https://graph.facebook.com/${this.apiVersion}/me/messages`;
+      const payload = {
+        recipient: { id: recipientId },
+        message: {
+          attachment: {
+            type: 'image',
+            payload: {
+              url: imageUrl,
+              is_reusable: true
+            }
+          }
+        }
+      };
+
+      await axios.post(url, payload, {
+        headers: {
+          'Authorization': `Bearer ${pageAccessToken}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      return true;
+    } catch (error: any) {
+      const errorMsg = error.response?.data?.error?.message || error.message;
+      logger.error(`Error sending image to Meta: ${errorMsg}`);
+      throw new Error(errorMsg);
+    }
+  }
 }
 
 export const metaService = new MetaService();
