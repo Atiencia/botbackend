@@ -78,12 +78,39 @@ describe('MetaService', () => {
       expect(duration).toBeGreaterThanOrEqual(750);
     });
     
-    it('should return false if API call fails', async () => {
+    it('should throw an error if API call fails', async () => {
       mockedAxios.post.mockRejectedValueOnce(new Error('API Error'));
       
-      const success = await metaService.sendMessage('123', 'Hello', 'token');
+      await expect(metaService.sendMessage('123', 'Hello', 'token')).rejects.toThrow('API Error');
+    });
+  });
+
+  describe('sendImage', () => {
+    it('should send an image successfully', async () => {
+      mockedAxios.post.mockResolvedValueOnce({ data: { success: true } });
       
-      expect(success).toBe(false);
+      const success = await metaService.sendImage('123', 'https://example.com/img.jpg', 'token');
+      
+      expect(success).toBe(true);
+      expect(mockedAxios.post).toHaveBeenCalledTimes(1);
+      expect(mockedAxios.post.mock.calls[0][1]).toEqual({
+        recipient: { id: '123' },
+        message: {
+          attachment: {
+            type: 'image',
+            payload: {
+              url: 'https://example.com/img.jpg',
+              is_reusable: true
+            }
+          }
+        }
+      });
+    });
+
+    it('should throw an error if image sending fails', async () => {
+      mockedAxios.post.mockRejectedValueOnce(new Error('Upload Error'));
+      
+      await expect(metaService.sendImage('123', 'url', 'token')).rejects.toThrow('Upload Error');
     });
   });
 });
