@@ -16,6 +16,9 @@ CREATE TABLE public.bot_configs (
     temperature NUMERIC DEFAULT 0.7,
     meta_access_token TEXT,
     meta_verify_token TEXT,
+    whatsapp_phone_id TEXT,
+    whatsapp_access_token TEXT,
+    whatsapp_verify_token TEXT,
     is_active BOOLEAN DEFAULT true,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
@@ -24,11 +27,12 @@ CREATE TABLE public.bot_configs (
 -- 2.5 Tabla de Clientes (Handoff a humano)
 CREATE TABLE public.customers (
     id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
-    instagram_user_id TEXT NOT NULL,
+    platform_user_id TEXT NOT NULL,
+    platform TEXT CHECK (platform IN ('instagram', 'messenger', 'whatsapp')) NOT NULL DEFAULT 'instagram',
     user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
     is_bot_active BOOLEAN DEFAULT true,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
-    UNIQUE(instagram_user_id, user_id)
+    UNIQUE(platform_user_id, platform, user_id)
 );
 
 -- 3. Tabla de Base de Conocimiento (knowledge)
@@ -69,7 +73,8 @@ $$;
 -- 4. Tabla de Chats (chats)
 CREATE TABLE public.chats (
     id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
-    instagram_user_id TEXT NOT NULL,
+    platform_user_id TEXT NOT NULL,
+    platform TEXT CHECK (platform IN ('instagram', 'messenger', 'whatsapp')) NOT NULL DEFAULT 'instagram',
     user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
     role TEXT CHECK (role IN ('user', 'assistant', 'system')) NOT NULL,
     content TEXT NOT NULL,

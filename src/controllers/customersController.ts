@@ -23,13 +23,13 @@ export const getCustomers = async (req: AuthRequest, res: Response) => {
 export const toggleBotActive = async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.user?.id;
-    const { instagram_user_id } = req.params;
+    const { platform_user_id } = req.params;
     const { is_bot_active } = req.body;
 
     const { data, error } = await supabase
       .from('customers')
       .update({ is_bot_active })
-      .eq('instagram_user_id', instagram_user_id)
+      .eq('platform_user_id', platform_user_id)
       .eq('user_id', userId)
       .select();
 

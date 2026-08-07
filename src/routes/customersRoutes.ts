@@ -7,6 +7,6 @@ const router = Router();
 router.use(requireAuth);
 
 router.get('/', getCustomers);
-router.post('/:instagram_user_id/toggle', toggleBotActive);
+router.post('/:platform_user_id/toggle', toggleBotActive);
 
 export default router;

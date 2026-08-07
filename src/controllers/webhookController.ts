@@ -45,6 +45,10 @@ export const handleIncomingMessage = async (req: Request, res: Response) => {
 
   // Verificamos si es un evento de pagina
   if (body.object === 'instagram' || body.object === 'page') {
+    let platform = 'instagram';
+    if (body.object === 'page') {
+      platform = 'messenger';
+    }
     for (const entry of body.entry) {
       // El ID de la pagina de Instagram/Facebook
       const pageId = entry.id;
@@ -81,11 +85,12 @@ export const handleIncomingMessage = async (req: Request, res: Response) => {
             try {
               // 1. Guardar mensaje del usuario en BD
               const { error: insertError } = await supabase.from('chats').insert({
-                instagram_user_id: senderId,
+                platform_user_id: senderId,
                 user_id: botConfig.user_id,
                 role: 'user',
                 content: messageText,
-                meta_message_id: metaMessageId
+                meta_message_id: metaMessageId,
+                platform
               });
 
               if (insertError) {
@@ -102,21 +107,22 @@ export const handleIncomingMessage = async (req: Request, res: Response) => {
               const { data: customerData } = await supabase
                 .from('customers')
                 .select('is_bot_active')
-                .eq('instagram_user_id', senderId)
+                .eq('platform_user_id', senderId)
                 .eq('user_id', botConfig.user_id)
                 .single();
 
               // Si el cliente no existe, lo creamos
               if (!customerData) {
                 await supabase.from('customers').insert({
-                  instagram_user_id: senderId,
-                  user_id: botConfig.user_id
+                  platform_user_id: senderId,
+                  user_id: botConfig.user_id,
+                  platform
                 });
               } else {
                 // Actualizar timestamp
                 await supabase.from('customers')
                   .update({ updated_at: new Date().toISOString() })
-                  .eq('instagram_user_id', senderId)
+                  .eq('platform_user_id', senderId)
                   .eq('user_id', botConfig.user_id);
               }
 
@@ -160,7 +166,7 @@ export const handleIncomingMessage = async (req: Request, res: Response) => {
               const { data: chatHistoryData } = await supabase
                 .from('chats')
                 .select('role, content')
-                .eq('instagram_user_id', senderId)
+                .eq('platform_user_id', senderId)
                 .eq('user_id', botConfig.user_id)
                 .order('timestamp', { ascending: false })
                 .limit(10);
@@ -184,7 +190,7 @@ export const handleIncomingMessage = async (req: Request, res: Response) => {
                 // Pausamos el bot automáticamente
                 await supabase.from('customers')
                   .update({ is_bot_active: false, updated_at: new Date().toISOString() })
-                  .eq('instagram_user_id', senderId)
+                  .eq('platform_user_id', senderId)
                   .eq('user_id', botConfig.user_id);
                   
                 logger.info(`Auto-Handoff triggered for customer ${senderId}. Bot muted.`);
@@ -200,10 +206,11 @@ export const handleIncomingMessage = async (req: Request, res: Response) => {
               if (sent) {
                 // 7. Guardar respuesta del bot en BD
                 await supabase.from('chats').insert({
-                  instagram_user_id: senderId,
+                  platform_user_id: senderId,
                   user_id: botConfig.user_id,
                   role: 'assistant',
-                  content: aiResponse
+                  content: aiResponse,
+                  platform
                 });
                 logger.info(`Successfully replied to ${senderId}`);
               }

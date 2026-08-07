@@ -107,6 +107,34 @@ export class MetaService {
       throw new Error(errorMsg);
     }
   }
+
+  /**
+   * Envía un mensaje a WhatsApp a través de Cloud API
+   */
+  async sendWhatsAppMessage(phoneNumberId: string, toPhoneNumber: string, messageText: string, whatsappAccessToken: string): Promise<boolean> {
+    try {
+      const url = `https://graph.facebook.com/${this.apiVersion}/${phoneNumberId}/messages`;
+      
+      const payload = {
+        messaging_product: "whatsapp",
+        to: toPhoneNumber,
+        type: "text",
+        text: { body: messageText }
+      };
+
+      await axios.post(url, payload, {
+        headers: {
+          'Authorization': `Bearer ${whatsappAccessToken}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      return true;
+    } catch (error: any) {
+      const errorMsg = error.response?.data?.error?.message || error.message;
+      logger.error(`Error sending message to WhatsApp: ${errorMsg}`);
+      throw new Error(errorMsg);
+    }
+  }
 }
 
 export const metaService = new MetaService();
